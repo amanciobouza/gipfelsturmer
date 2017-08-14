@@ -1,0 +1,17 @@
+{
+  "name": "cryptotrader",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node .cryptotrader"
+  },
+  "dependencies": {
+    "nonce": "1.0.4",
+    "crypto-js": "latest",
+    "request": "latest",
+    "autobahn": "latest",
+    "googleapis": "latest",
+    "google-auth-library": "latest",
+    "lodash": "latest"
+  }
+}
