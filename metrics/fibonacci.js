@@ -28,3 +28,20 @@ Fibonacci.calcPriceLevel = function (aLowPrice, aHighPrice, aFibonacciLevel) {
 Fibonacci.createIdentifier = function (aLevel) {
     return PREFIX + parseFloat(aLevel * 100).toFixed(1);
 };
+
+Fibonacci.count = function (anIndex) {
+    if (anIndex < 3) {
+        return 1;
+    }
+
+    var fibValue = 1;
+    var prevFibValue = 1;
+
+    for (var i = 2; i < anIndex; i++) {
+        var currentFibValue = fibValue;
+        fibValue = fibValue + prevFibValue;
+        prevFibValue = currentFibValue;
+    }
+
+    return fibValue;
+};

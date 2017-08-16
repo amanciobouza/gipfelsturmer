@@ -15,6 +15,8 @@ var analyzer = require('./analyzer');
 var bittrexAPI = require('./market/bittrexAPI');
 var configurations = require('./config');
 var googleAPI = require('./googlespreadsheetAPI');
+var fibonacci = require('./metrics/fibonacci');
+var stats = require('./metrics/stats');
 
 var masterTrader = module.exports = {};
 
@@ -29,11 +31,12 @@ var traders = [];
  * ################################
  */
 function receiveMarketUpdate(aTicker, aTickerHistory, aMarketAnalysis, aTraderId) {
-
+    //Initialize
     initializeTrader(aTraderId);
     googleAPI.initializeTrader(aTraderId);
-    aTicker.simulated = configurations.isSimulation(aTraderId);
     var trader = findTrader(aTraderId);
+    aTicker.simulated = configurations.isSimulation(aTraderId);
+    //Adapt prizes
 
     //not yet ready to trade
     if (_.isNil(aMarketAnalysis)) {
@@ -98,13 +101,15 @@ function receiveMarketUpdate(aTicker, aTickerHistory, aMarketAnalysis, aTraderId
     }
 }
 
-function createTransaction(aTicker) {
-    aTicker.buyRate = "";
-    aTicker.sellRate = calcTradeRate(aMarketAnalysis.price.last, aMarketAnalysis.price.highestBid, aTraderId);
-    aTicker.buyAmount = "";
-    aTicker.sellAmount = isSell;
-    aTicker.buyTotal = "";
-    aTicker.sellTotal = aTicker.sellRate * aTicker.sellAmount;
+function adaptPrizes(aTraderId) {
+    var buyStack = configurations.getBuyStack(aTraderId);
+    var priceAdaptionRate = configurations.getPriceAdaptationRate(aTraderId);
+
+    for (var i = 0; i < buyStack.length; i++) {
+        buyStack[i].price = buyStack[i].price * (1 + priceAdaptionRate);
+    }
+
+    configurations.setBuyStack(buyStack, aTraderId);
 }
 
 /**################################
@@ -120,7 +125,8 @@ function tryBuying(aMarketAnalysis, aTraderId) {
     var amountMultiplier = calcAmountMultiplier(aMarketAnalysis, TYPE_BUY, configurations.getTradeAmounts(aTraderId));
     var amountToBuy = normalizePrice(amountMultiplier * configurations.getOrderLimit(aTraderId) / buyRate);
     if (amountToBuy > configurations.getBalance(aTraderId) / buyRate) {
-        log(now + ": No Buying\t- not enough balance to buy.\t\t" + configurations.getBalance(aTraderId) + "Ƀ", aTraderId);
+        log(now + ": No Buying\t- not enough balance to buy.\t\t" + configurations.getBalance(aTraderId) + "Ƀ, " + amountToBuy + "Ƀ needed. Adapting prizes.", aTraderId);
+        adaptPrizes(aTraderId);
         return false;
     }
     //no budget to buy
@@ -151,7 +157,7 @@ function tryBuying(aMarketAnalysis, aTraderId) {
     }
 
     //don't repeat action on same level to avoid short term oscillation
-    let similarPrice = isSimilarPrice(aTraderId, buyRate, configurations.getPriceSimilarityRange(aTraderId));
+    let similarPrice = isInFibonacciPriceRange(aTraderId, buyRate, configurations.getPriceSimilarityRange(aTraderId));
     if (similarPrice) {
         log(now + ": No Buying\t- already bought at same buy rate.\t\t[now " + buyRate + "Ƀ | prev " + similarPrice + "Ƀ]", aTraderId);
         return false;
@@ -181,7 +187,7 @@ function tryBuying(aMarketAnalysis, aTraderId) {
     }
 
     //calc amount to buy
-    addOrderToStack(buyRate, amountToBuy, aMarketAnalysis.price.fibonacci.level, configurations.getBuyFee(aTraderId), aTraderId);
+    addOrderToStack(buyRate, amountToBuy, configurations.getBuyFee(aTraderId), aTraderId);
 
     var budget = configurations.getBudget(aTraderId) - buyRate * amountToBuy * configurations.getBuyFee(aTraderId);
     configurations.setBudget(budget, aTraderId);
@@ -335,15 +341,38 @@ function clearBuyStack(aTraderId, aPrice, someFees) {
     configurations.setBuyStack(buyStack, aTraderId);
 }
 
-function isSimilarPrice(aTraderId, aPrice, minTradeRange) {
-    var buyStack = configurations.getBuyStack(aTraderId);
-    for (var i = 0; i < buyStack.length; i++) {
-        var buyStackPrice = buyStack[i].price;
-        if (_.inRange(aPrice, buyStackPrice * (1 - minTradeRange), buyStackPrice * (1 + minTradeRange))) {
+function isSimilarPrice(aPrice, aMinTradeRange, aBuyStack) {
+
+    for (var i = 0; i < aBuyStack.length; i++) {
+        var buyStackPrice = aBuyStack[i].price;
+        if (_.inRange(aPrice, buyStackPrice * (1 - aMinTradeRange), buyStackPrice * (1 + aMinTradeRange))) {
             return buyStackPrice;
         }
     }
     return false;
+}
+
+function isInFibonacciPriceRange(aPrice, aMinTradeRange, aBuyStack) {
+    if (aBuyStack.length < 3) {
+        return isSimilarPrice(aPrice, aMinTradeRange, aBuyStack);
+    }
+
+    var fibonacciCounter = fibonacci.count(aBuyStack.length);
+    var maxPrice = stats.calcMaxPrice(extractPricesFromBuyStack(aBuyStack));
+    var minPrice = maxPrice - fibonacciCounter * aMinTradeRange;
+    if (_.inRange(aPrice, maxPrice, minPrice)) {
+        return minPrice;
+    }
+
+    return false;
+}
+
+function extractPricesFromBuyStack(aBuyStack) {
+    var results = [];
+    for (var i = 0; i < aBuyStack.length; i++) {
+        results.push(aBuyStack[i].price);
+    }
+    return results;
 }
 
 function calcAmountMultiplier(aMarketAnalysis, aType, someAmounts) {
@@ -380,12 +409,12 @@ function calcAmountMultiplier(aMarketAnalysis, aType, someAmounts) {
     }
 }
 
-function addOrderToStack(aPrice, anAmount, aFibonacciLevel, aFee, aTraderId) {
+function addOrderToStack(aPrice, anAmount, aFee, aTraderId) {
     var buyStack = configurations.getBuyStack(aTraderId);
     var order = {};
+    order.originalPrice = +aPrice;
     order.price = +aPrice;
     order.amount = anAmount * (1 - aFee);
-    order.fibonacciLevel = aFibonacciLevel;
     order.datetime = new Date().toISOString();
 
     buyStack.push(order);

@@ -61,6 +61,10 @@ configurations.isInstantTrade = function (anId) {
     return get(anId).settings.instantTrade;
 };
 
+configurations.getPriceAdaptationRate = function (anId) {
+    return get(anId).settings.priceAdaptationRate;
+};
+
 /**
  * ################################
  * ### MARGIN TRADING #############
