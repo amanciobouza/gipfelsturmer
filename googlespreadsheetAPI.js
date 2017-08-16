@@ -34,7 +34,7 @@ var TOKEN_PATH = TOKEN_DIR + 'sheets.googleapis.com-nodejs-quickstart.json';
 function wipe(auth, aSpreadsheetId, aTab) {
     var range = tabRange + (tickerLimit + 1);
     var data = [];
-    fill(data, tickerLimit);
+    fill(data, tickerLimit + 1);
 
     sheets.spreadsheets.values.update({
         auth: auth,
@@ -59,7 +59,9 @@ function swipeWindow(auth, someData, aSpreadsheetId, aTab) {
         resource: {"values": [someData]}
     }, function (err, response) {
         if (err) {
-            console.log('The API returned an error: ' + err);
+            if (err.code != 502) {
+                console.log('The API returned an error: ' + err);
+            }
         }
     });
 }
