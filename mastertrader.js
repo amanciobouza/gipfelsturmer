@@ -157,9 +157,9 @@ function tryBuying(aMarketAnalysis, aTraderId) {
     }
 
     //don't repeat action on same level to avoid short term oscillation
-    let similarPrice = isInFibonacciPriceRange(aTraderId, buyRate, configurations.getPriceSimilarityRange(aTraderId));
+    let similarPrice = isInFibonacciPriceRange(buyRate, configurations.getMinTradeRange(aTraderId), configurations.getBuyStack(aTraderId));
     if (similarPrice) {
-        log(now + ": No Buying\t- already bought at same buy rate.\t\t[now " + buyRate + "Ƀ | prev " + similarPrice + "Ƀ]", aTraderId);
+        log(now + ": No Buying\t- already bought at similar buy rate.\t\t[now " + buyRate + "Ƀ | prev " + similarPrice + "Ƀ]", aTraderId);
         return false;
     }
 
@@ -270,7 +270,7 @@ function trySelling(aMarketAnalysis, aTraderId) {
         return false;
     }
 
-    clearBuyStack(aTraderId, sellRate, configurations.getMinTradeRange(aTraderId));
+    clearBuyStack(aTraderId, sellRate, targetTradeProfitRate);
 
     var budget = configurations.getBudget(aTraderId) + sellRate * amountToTrade * configurations.getSellFee(aTraderId);
     configurations.setBudget(budget, aTraderId);
@@ -342,7 +342,6 @@ function clearBuyStack(aTraderId, aPrice, someFees) {
 }
 
 function isSimilarPrice(aPrice, aMinTradeRange, aBuyStack) {
-
     for (var i = 0; i < aBuyStack.length; i++) {
         var buyStackPrice = aBuyStack[i].price;
         if (_.inRange(aPrice, buyStackPrice * (1 - aMinTradeRange), buyStackPrice * (1 + aMinTradeRange))) {
@@ -357,9 +356,14 @@ function isInFibonacciPriceRange(aPrice, aMinTradeRange, aBuyStack) {
         return isSimilarPrice(aPrice, aMinTradeRange, aBuyStack);
     }
 
-    var fibonacciCounter = fibonacci.count(aBuyStack.length);
     var maxPrice = stats.calcMaxPrice(extractPricesFromBuyStack(aBuyStack));
-    var minPrice = maxPrice - fibonacciCounter * aMinTradeRange;
+    if (aPrice > maxPrice) {
+        return isSimilarPrice(aPrice, aMinTradeRange, aBuyStack);
+    }
+
+    var fibonacciCounter = fibonacci.count(aBuyStack.length + 1);
+
+    var minPrice = maxPrice - fibonacciCounter * (aMinTradeRange * maxPrice);
     if (_.inRange(aPrice, maxPrice, minPrice)) {
         return minPrice;
     }
