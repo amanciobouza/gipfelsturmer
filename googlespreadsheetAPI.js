@@ -32,7 +32,7 @@ var TOKEN_DIR = (process.env.HOME || process.env.HOMEPATH ||
 var TOKEN_PATH = TOKEN_DIR + 'sheets.googleapis.com-nodejs-quickstart.json';
 
 function wipe(auth, aSpreadsheetId, aTab) {
-    var range = tabRange + (tickerLimit + 1);
+    var range = tabRange + (tickerLimit + 2);
     var data = [];
     fill(data, tickerLimit + 1);
 
