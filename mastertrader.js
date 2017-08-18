@@ -157,7 +157,10 @@ function tryBuying(aMarketAnalysis, aTraderId) {
     }
 
     //don't repeat action on same level to avoid short term oscillation
-    let similarPrice = isInFibonacciPriceRange(buyRate, configurations.getMinTradeRange(aTraderId), configurations.getBuyStack(aTraderId));
+    let similarPrice = isSimilarPrice(buyRate, configurations.getMinTradeRange(aTraderId), configurations.getBuyStack(aTraderId));
+    if (aMarketAnalysis.price.percentChange < 0) {
+        similarPrice = isInFibonacciPriceRange(buyRate, configurations.getMinTradeRange(aTraderId), configurations.getBuyStack(aTraderId));
+    }
     if (similarPrice) {
         log(now + ": No Buying\t- already bought at similar buy rate.\t\t[now " + buyRate + "Ƀ | prev " + similarPrice + "Ƀ]", aTraderId);
         return false;
@@ -272,7 +275,7 @@ function trySelling(aMarketAnalysis, aTraderId) {
 
     clearBuyStack(aTraderId, sellRate, targetTradeProfitRate);
 
-    var budget = configurations.getBudget(aTraderId) + sellRate * amountToTrade * configurations.getSellFee(aTraderId);
+    var budget = configurations.getBudget(aTraderId) + sellRate * amountToTrade(targetTradeProfitRate - configurations.getSellFee(aTraderId));
     configurations.setBudget(budget, aTraderId);
     configurations.setOrderLimit(budget / configurations.getMaxOrders(aTraderId), aTraderId);
     var balanceChange = sellRate * amountToTrade * (1 - configurations.getSellFee(aTraderId));
@@ -362,7 +365,6 @@ function isInFibonacciPriceRange(aPrice, aMinTradeRange, aBuyStack) {
     }
 
     var fibonacciCounter = fibonacci.count(aBuyStack.length + 1);
-
     var minPrice = maxPrice - fibonacciCounter * (aMinTradeRange * maxPrice);
     if (_.inRange(aPrice, maxPrice, minPrice)) {
         return minPrice;
