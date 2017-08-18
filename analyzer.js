@@ -97,6 +97,8 @@ function analyzeMarketWindow(aTickerHistory, aPriceHistory, aTrader) {
     result.price.first = normalizePrice(getLastPrice(firstTicker));
     result.price.highestBid = normalizePrice(getHighestBid(lastTicker));
     result.price.lowestAsk = normalizePrice(getLowestAsk(lastTicker));
+    result.price.percentChange = normalizePrice(getPercentChange(lastTicker));
+
 
     //set stats
     var lowestPrice = Stats.calcMinPrice(aPriceHistory);
@@ -279,6 +281,10 @@ function getLowestAsk(aTicker) {
 
 function getHighestBid(aTicker) {
     return +aTicker.highestBid;
+}
+
+function getPercentChange(aTicker) {
+    return +aTicker.percentChange;
 }
 
 function get24hrHigh(aTicker) {
